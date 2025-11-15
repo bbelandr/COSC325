@@ -41,32 +41,27 @@ class preprocesser:
                 newDf.loc[self.df[name] == cat, colName] = 1    # set 1 where the original column equals this category
 
             newDf.drop(columns=[name], inplace=True)
-            print(newDf)
         self.df = newDf
         return newDf
 
+    # Returns the modified dataframe and also modifies the dataframe that it holds internally. 
     def minMaxScale(self, columnNames):
-        newDf = self.df
-        for name in columnNames:
-            # get unique categories (preserve stable order), skip NaN
-            cats = list(pd.Series(self.df[name].dropna().unique()))
-            if not cats:
-                continue
-            encodedCats = cats[1:]  # drop the first category to avoid perfect multicollinearity
-            for cat in encodedCats:
-                colName = f"{name}.{cat}"
-                newDf[colName] = 0  # initialize column to 0
-                newDf.loc[self.df[name] == cat, colName] = 1    # set 1 where the original column equals this category
+        newDf = self.df.copy()
 
-            newDf.drop(columns=[name], inplace=True)
-            print(newDf)
+        for name in columnNames:
+            # Normalize
+            col = self.df[name]
+            newDf[name] = (col - col.min()) / (col.max() - col.min())
         self.df = newDf
         return newDf
+    
+    def standardize(self, columnNames):
+        
 
     def produceCSV(self, fileName):
         self.df.to_csv(fileName)
 
 if __name__ == "__main__":
     thingy = preprocesser("train.csv")
-    thingy.oneHotEncode(["Sex", "Embarked"])
+    thingy.minMaxScale(["Age", "Fare"])
     thingy.produceCSV("out.csv")
