@@ -28,7 +28,7 @@ class preprocesser:
     return newDf
     """
     def oneHotEncode(self, columnNames):
-        newDf = self.df
+        newDf = self.df.copy()
         for name in columnNames:
             # get unique categories (preserve stable order), skip NaN
             cats = list(pd.Series(self.df[name].dropna().unique()))
@@ -56,12 +56,19 @@ class preprocesser:
         return newDf
     
     def standardize(self, columnNames):
-        
+        newDf = self.df.copy()
+
+        for name in columnNames:
+            # Normalize
+            col = self.df[name]
+            newDf[name] = (col - col.mean()) / col.std()
+        self.df = newDf
+        return newDf
 
     def produceCSV(self, fileName):
         self.df.to_csv(fileName)
 
 if __name__ == "__main__":
     thingy = preprocesser("train.csv")
-    thingy.minMaxScale(["Age", "Fare"])
+    thingy.standardize(["Age", "Fare"])
     thingy.produceCSV("out.csv")
