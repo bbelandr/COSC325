@@ -1,74 +1,57 @@
 import pandas as pd
-
-# ONE_HOT_ENCODE = ["Sex", "Embarked"]
+import matplotlib.pyplot as plt
 
 class preprocesser:
     def __init__(self, pathToCSV):
         df = pd.read_csv(pathToCSV)
         self.df = df
 
-    """
-    oneHotEncode(columnNames)
-    newDf = df
-    for each name in columnNames:
-        set uniqueData
-        for each data in df[name]: 
-            uniqueData.add(data)
-            This will give us unique entries for every different input in the column
-        remove one of the entries from uniqueData
-            This will ensure that we don't over-encode
-        for data in uniqueData
-            newDf.addColumn(data)
-                Make sure this is initialized to 0
-        for row in df:
-            if row[name] in data:
-                newDf[row[name]] = 1
-        delete column newDf[name]
-        df = newDf
-    return newDf
-    """
-    def oneHotEncode(self, columnNames):
-        newDf = self.df.copy()
-        for name in columnNames:
-            # get unique categories (preserve stable order), skip NaN
-            cats = list(pd.Series(self.df[name].dropna().unique()))
-            if not cats:
-                continue
-            encodedCats = cats[1:]  # drop the first category to avoid perfect multicollinearity
-            for cat in encodedCats:
-                colName = f"{name}.{cat}"
-                newDf[colName] = 0  # initialize column to 0
-                newDf.loc[self.df[name] == cat, colName] = 1    # set 1 where the original column equals this category
-
-            newDf.drop(columns=[name], inplace=True)
-        self.df = newDf
-        return newDf
-
-    # Returns the modified dataframe and also modifies the dataframe that it holds internally. 
-    def minMaxScale(self, columnNames):
-        newDf = self.df.copy()
-
-        for name in columnNames:
-            # Normalize
-            col = self.df[name]
-            newDf[name] = (col - col.min()) / (col.max() - col.min())
-        self.df = newDf
-        return newDf
+    # finds titles like Mr. and Miss and Dr. and puts them into a "Title" column
+    def extractTitles(self):
+        self.df["Title"] = self.df["Name"].str.extract(r",\s*([^\.]+)\.")
+        return self.df
     
-    def standardize(self, columnNames):
-        newDf = self.df.copy()
+    # Some ticket numbers are the same, so this counts them and puts them into "TicketGroupSize"
+    def findTicketGroups(self):
+        self.df["TicketGroupSize"] = self.df.groupby("Ticket")["Ticket"].transform("count")
 
-        for name in columnNames:
-            # Normalize
-            col = self.df[name]
-            newDf[name] = (col - col.mean()) / col.std()
-        self.df = newDf
-        return newDf
+    def makeUnknownEmbarkCategory(self):
+        self.df["Embarked"] = self.df["Embarked"].fillna("Unknown")
+
+    def binAges(self):
+        self.df["AgeGroup"] = pd.cut(
+            self.df["Age"],
+            bins=[0, 12, 18, 35, 50, 80, 200],
+            labels=["Child", "Teen", "YoungAdult", "Adult", "Senior", "WiseOne"]
+        )
+
+        # Imputation
+        self.df["AgeGroup"] = self.df["AgeGroup"].cat.add_categories("Unknown")
+        self.df["AgeGroup"] = self.df["AgeGroup"].fillna("Unknown")
+        
+    def removeColumns(self, columnNames):
+        self.df = self.df.drop(columnNames, axis=1)
 
     def produceCSV(self, fileName):
         self.df.to_csv(fileName)
 
+
 if __name__ == "__main__":
     thingy = preprocesser("train.csv")
-    thingy.standardize(["Age", "Fare"])
+    
+    # Feature Generation
+    thingy.extractTitles()
+    thingy.findTicketGroups()
+    thingy.makeUnknownEmbarkCategory()
+    thingy.binAges()
+
+    # Removing the stuff that I don't want
+    thingy.removeColumns(["Name", "Age", "Ticket", "Cabin"])
+
+    # plt.hexbin(thingy.df['SibSp'], thingy.df['Parch'], gridsize=10, cmap='viridis')
+    # plt.colorbar(label='Density')
+    # plt.xlabel('SibSp')
+    # plt.ylabel('Parch')
+    # plt.show()
+    print(thingy.df.head())
     thingy.produceCSV("out.csv")
